@@ -5,7 +5,7 @@
 [![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org)
 [![Windows](https://img.shields.io/badge/platform-Windows%2010/11-blue.svg)](https://www.microsoft.com/windows)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.0-brightgreen.svg)](https://github.com/yourusername/rusty-vault)
+[![Version](https://img.shields.io/badge/version-2.0-brightgreen.svg)](https://github.com/SynrgStudio/rusty-vault)
 
 > Una aplicación **moderna de backup automático** que combina la **robustez de robocopy** con una **interfaz gráfica intuitiva** desarrollada en Rust.
 
