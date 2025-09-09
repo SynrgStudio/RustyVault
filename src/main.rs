@@ -31,7 +31,7 @@ fn main() -> Result<()> {
     }
     
     info!("🚀 Iniciando RustyVault v2.0");
-    info!("👤 Desarrollado por Alexis Texas - Rust Senior Developer");
+    info!("👤 Desarrollado por Damian Naone");
     
     // Configurar egui para Windows
     let native_options = eframe::NativeOptions {
@@ -68,7 +68,7 @@ fn main() -> Result<()> {
 /// Muestra mensaje de ayuda CLI
 fn show_help_message() {
     println!("🔧 RustyVault v2.0 - Modern Backup Automation");
-    println!("👤 Desarrollado por Alexis Texas");
+    println!("👤 Desarrollado por Damian Naone");
     println!();
     println!("USO:");
     println!("  rusty-vault.exe [OPTIONS]");

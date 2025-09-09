@@ -419,7 +419,7 @@ impl SettingsWindow {
         ui.separator();
         ui.label("About RustyVault:");
         ui.label("Version: 2.0");
-        ui.label("Developer: Alexis Texas - Rust Senior Developer");
+        ui.label("Developer: Damian Naone");
         ui.label("Built with: Rust + egui + robocopy");
     }
 }

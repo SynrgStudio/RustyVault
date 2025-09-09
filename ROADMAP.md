@@ -2,7 +2,7 @@
 
 **Version:** 2.0  
 **Last Updated:** August 2025  
-**Developer:** Alexis Texas - Rust Senior Developer  
+**Developer:** Damian Naone
 
 ## 📋 Project Overview
 
@@ -274,8 +274,7 @@ Una aplicación **moderna de backup automático** para Windows que combina la **
 
 ## 📞 SUPPORT & FEEDBACK
 
-**Developer:** Alexis Texas  
-**Expertise:** Rust Senior Developer - 15 años programación, 5 años Rust  
+**Developer:**  Damian Naone 
 **Focus:** Sistemas robustos, CLI tools, Windows integration  
 
 **Project Repository:** RustyVault v2.0  
@@ -283,5 +282,3 @@ Una aplicación **moderna de backup automático** para Windows que combina la **
 **Target Platform:** Windows 10/11 (primary), con expansión futura multiplataforma  
 
 ---
-
-*Last updated: August 2025 - Living document que se actualiza con cada milestone alcanzado* 

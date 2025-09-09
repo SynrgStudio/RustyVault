@@ -26,7 +26,7 @@ $RELEASE_NAME = "RustyVault"
 $INCLUDE_PATHS = @(
     "target/release/rusty-vault.exe",
     "README.md",
-    "LICENSE",
+    "LICENSE.txt",
     "ico.ico"
 )
 
@@ -345,9 +345,9 @@ function New-GitHubRelease {
 - Windows-optimized build
 
 ### 📦 Installation
-1. Download the \`$ReleaseZip\` file below
+1. Download the ``$ReleaseZip`` file below
 2. Extract all files to a folder of your choice
-3. Run \`rusty-vault.exe\`
+3. Run ``rusty-vault.exe``
 4. Configure your backup settings through the GUI
 
 ### ✨ What's Included
@@ -484,29 +484,29 @@ else {
 
 Write-Host "`n  -> Release completado exitosamente!" -ForegroundColor Green
 Write-Host "   Archivo: $releaseZip" -ForegroundColor White
-Write-Host "   Versión: v$version" -ForegroundColor White
+Write-Host "   Version: v$version" -ForegroundColor White
 
 if ($AutoRelease) {
     Write-Host "   Tag: v$version (creado y pusheado)" -ForegroundColor Green
-    Write-Host "   GitHub Release: Creado automáticamente" -ForegroundColor Green
-    Write-Host "   Estado: LISTO PARA DISTRIBUCIÓN" -ForegroundColor Green
+    Write-Host "   GitHub Release: Creado automaticamente" -ForegroundColor Green
+    Write-Host "   Estado: LISTO PARA DISTRIBUCION" -ForegroundColor Green
     
     Write-Host "`n  -> AutoRelease completado!" -ForegroundColor Cyan
     Write-Host "   1. Proyecto compilado en modo release" -ForegroundColor Gray
     Write-Host "   2. Todos los cambios commiteados al repositorio" -ForegroundColor Gray
     Write-Host "   3. Tag v$version creado y pusheado" -ForegroundColor Gray  
     Write-Host "   4. GitHub Release publicado con ZIP adjunto" -ForegroundColor Gray
-    Write-Host "   5. RustyVault listo para descarga pública" -ForegroundColor Gray
+    Write-Host "   5. RustyVault listo para descarga publica" -ForegroundColor Gray
 }
 elseif ($Tag) {
     Write-Host "   Tag: v$version" -ForegroundColor White
     
-    Write-Host "`n  -> Próximos pasos:" -ForegroundColor Yellow
+    Write-Host "`n  -> Proximos pasos:" -ForegroundColor Yellow
     Write-Host "   1. Probar el ejecutable desde $releaseZip" -ForegroundColor Gray
     Write-Host "   2. Subir a GitHub Releases manualmente" -ForegroundColor Gray
 }
 else {
-    Write-Host "`n  -> Próximos pasos:" -ForegroundColor Yellow
+    Write-Host "`n  -> Proximos pasos:" -ForegroundColor Yellow
     Write-Host "   1. Probar el ejecutable desde $releaseZip" -ForegroundColor Gray
     Write-Host "   2. Crear release completo con: .\release.ps1 -AutoRelease" -ForegroundColor Gray
     Write-Host "   3. O solo tag con: .\release.ps1 -Tag" -ForegroundColor Gray

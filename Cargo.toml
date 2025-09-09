@@ -1,8 +1,8 @@
 [package]
 name = "rusty-vault"
-version = "2.0.0"
+version = "2.0.1"
 edition = "2021"
-authors = ["Alexis Texas <alexis@example.com>"]
+authors = ["Damian Naone <https://github.com/SynrgStudio>"]
 description = "RustyVault - Modern backup automation tool with intuitive GUI for Windows"
 license = "MIT"
 
