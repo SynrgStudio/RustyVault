@@ -1,0 +1,316 @@
+---
+alwaysApply: false
+---
+## Consideraciones GUI Específicas
+
+### Responsividad
+- NUNCA ejecutes robocopy en el UI thread
+- Usa `ctx.request_repaint()` para actualizar UI cuando llegan updates
+- Implementa debouncing para inputs que cambien frecuentemente
+- Usa `egui::Ui::spinner()` para indicar operaciones en progreso
+
+### UX Considerations
+- Implementa validación de inputs en tiempo real
+- Muestra tooltips para opciones avanzadas
+- Persistir ventana size/position entre sesiones
+- Implementa drag & drop para selección de carpetas
+- Provee shortcuts de teclado para acciones comunes
+
+### File System Integration
+- Usa file dialogs nativos (`rfd`) para mejor UX
+- Implementa preview de archivos/carpetas seleccionadas
+- Muestra iconos apropiados para tipos de archivo
+- Integra con Explorer context menu cuando sea posible
+
+### Error Handling en UI
+- Muestra errores en modals o notifications, no en console
+- Implementa retry mechanisms accesibles desde UI
+- Logga errores pero también muestra mensajes user-friendly
+- Permte al usuario reportar errores fácilmente### UI Layout con egui
+```rust
+fn render_main_panel(&mut self, ui: &mut egui::Ui) {
+    ui.horizontal(|ui| {
+        ui.label("Source:");
+        if ui.button("📁 Browse").clicked() {
+            if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                self.config.source_path = path;
+            }
+        }
+        ui.text_edit_singleline(&mut self.config.source_path_str);
+    });
+    
+    // Progress bar cuando hay backup corriendo
+    if let BackupState::Running { progress, current_file } = &self.backup_state {
+        ui.add(egui::ProgressBar::new(*progress).text(current_file));
+    }
+    
+    // Botones de acción
+    ui.horizontal(|ui| {
+        if ui.button("Start Backup").clicked() {
+            self.start_backup();
+        }
+        if ui.button("Schedule").clicked() {
+            self.show_schedule_dialog = true;
+        }
+    });
+}
+```# Cursor Rules para Aplicación de Backup Automático - Rust + Robocopy
+
+## Contexto del Proyecto
+Estás ayudando a desarrollar una aplicación GUI en Rust que automatiza backups de directorios usando robocopy en Windows. La aplicación debe ser robusta, eficiente y fácil de usar con una interfaz gráfica intuitiva.
+
+## Principios de Desarrollo
+
+### Rust Best Practices
+- SIEMPRE usa `Result<T, E>` para manejo de errores, nunca `.unwrap()` o `.expect()` en código de producción
+- Prefiere `anyhow::Result` para errores de aplicación y `thiserror` para errores de librería
+- Usa `tracing` en lugar de `println!` para logging
+- Implementa `From` traits para conversiones de errores cuando sea apropiado
+- Prefiere structs tipadas sobre tipos primitivos para mayor seguridad de tipos
+
+### Arquitectura y Diseño
+- Separa la lógica de negocio del código de UI usando arquitectura MVC/MVP
+- Usa el patrón Command para operaciones de backup
+- Implementa comunicación async entre UI thread y worker threads
+- Diseña pensando en responsividad - nunca bloquees el UI thread
+- Usa channels (mpsc) para comunicación thread-safe entre backend y frontend
+- Implementa configuración via archivos TOML con `serde`
+- Diseña pensando en testing - separa lógica de UI de lógica de negocio
+
+### Windows/Robocopy Específico
+- Valida siempre rutas de Windows (UNC paths, paths largos, caracteres especiales)
+- Parsea correctamente los códigos de salida de robocopy (0, 1, 2, 4, 8, 16, etc.)
+- Maneja timeouts apropiados para operaciones de red
+- Considera VSS (Volume Shadow Copy) para archivos en uso
+- Implementa retry logic para fallos de red/temporales
+
+## Estructura de Código Preferida
+
+### GUI Framework (egui recomendado)
+```rust
+use eframe::egui;
+use std::sync::mpsc;
+use anyhow::Result;
+
+#[derive(Default)]
+struct BackupApp {
+    config: BackupConfig,
+    backup_state: BackupState,
+    progress_rx: Option<mpsc::Receiver<ProgressUpdate>>,
+    logs: Vec<LogEntry>,
+}
+
+impl eframe::App for BackupApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // UI logic aquí
+        self.handle_progress_updates();
+        self.render_ui(ctx);
+    }
+}
+```
+
+### Arquitectura Thread-Safe
+```rust
+use std::sync::mpsc;
+use tokio::task;
+
+struct BackupManager {
+    progress_tx: mpsc::Sender<ProgressUpdate>,
+}
+
+impl BackupManager {
+    fn start_backup(&self, config: BackupConfig) -> Result<()> {
+        let progress_tx = self.progress_tx.clone();
+        
+        task::spawn(async move {
+            // Lógica de backup en background thread
+            execute_backup_with_progress(config, progress_tx).await
+        });
+        
+        Ok(())
+    }
+}
+```
+
+### Error Handling Pattern
+```rust
+use anyhow::{Context, Result};
+
+fn backup_directory(source: &Path, dest: &Path) -> Result<BackupResult> {
+    validate_paths(source, dest)
+        .context("Path validation failed")?;
+    
+    execute_robocopy(source, dest)
+        .context("Robocopy execution failed")?;
+    
+    Ok(BackupResult::Success)
+}
+```
+
+### Configuración
+```rust
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize, Serialize)]
+struct BackupConfig {
+    source_paths: Vec<PathBuf>,
+    destination: PathBuf,
+    schedule: Schedule,
+    robocopy_options: RobocopyOptions,
+    notifications: NotificationConfig,
+}
+```
+
+## Librerías Recomendadas
+
+### GUI Framework
+- `eframe` + `egui` - GUI moderna, nativa y cross-platform (RECOMENDADO)
+- `tauri` - Si prefieres web technologies con Rust backend
+- `iced` - Alternativa inspirada en Elm
+- `slint` - GUI declarativa (alternativa)
+
+### Threading y Async
+- `tokio` - Runtime async para operaciones de background
+- `std::sync::mpsc` - Channels para comunicación UI ↔ Backend
+- `parking_lot` - Sincronización más eficiente que std
+
+### Esenciales
+- `anyhow` - Error handling simplificado
+- `tracing` + `tracing-subscriber` - Logging estructurado
+- `serde` + `toml` - Serialización de configuración
+
+### Utilidades
+- `walkdir` - Para traversal de directorios
+- `chrono` - Manejo de fechas y tiempos
+- `notify-rust` - Notificaciones del sistema
+- `regex` - Para parsing de output de robocopy
+- `rfd` - File dialogs nativos para selección de directorios
+- `dirs` - Para encontrar directorios del sistema (config, data)
+
+## Patrones de Código Específicos
+
+### Manejo de State en GUI
+```rust
+#[derive(Debug, Clone)]
+enum BackupState {
+    Idle,
+    Running { progress: f32, current_file: String },
+    Completed { summary: BackupSummary },
+    Error { message: String },
+}
+
+#[derive(Debug, Clone)]
+enum ProgressUpdate {
+    FileStarted(String),
+    ProgressChanged(f32),
+    Completed(BackupSummary),
+    Error(String),
+}
+```
+
+### Comunicación Thread-Safe
+```rust
+fn spawn_backup_task(
+    config: BackupConfig,
+    progress_tx: mpsc::Sender<ProgressUpdate>,
+) {
+    std::thread::spawn(move || {
+        let result = execute_backup_with_progress(&config, &progress_tx);
+        
+        match result {
+            Ok(summary) => {
+                let _ = progress_tx.send(ProgressUpdate::Completed(summary));
+            }
+            Err(e) => {
+                let _ = progress_tx.send(ProgressUpdate::Error(e.to_string()));
+            }
+        }
+    });
+}
+```
+
+### Validación de Rutas Windows
+```rust
+fn validate_windows_path(path: &Path) -> Result<()> {
+    // Verifica existencia, permisos, caracteres válidos
+    // Maneja UNC paths \\server\share
+    // Considera MAX_PATH limitations
+}
+```
+
+### Ejecución de Robocopy
+```rust
+fn execute_robocopy(cmd: &RobocopyCommand) -> Result<RobocopyResult> {
+    let output = Command::new("robocopy")
+        .args(&cmd.build_args())
+        .output()
+        .context("Failed to execute robocopy")?;
+    
+    parse_robocopy_result(output)
+}
+```
+
+### Testing
+- Usa `tempfile` para tests que requieren filesystem
+- Mock robocopy calls en tests unitarios
+- Testa lógica de negocio separadamente de UI
+- Implementa integration tests con directorios temporales
+- Considera visual regression tests para UI critical paths
+
+## Consideraciones de Seguridad
+- Valida inputs de usuario para prevenir command injection
+- Sanitiza rutas antes de pasar a robocopy
+- Loggea operaciones sin exponer información sensible
+- Maneja credenciales de red de forma segura
+
+## Observabilidad y Debugging
+- Usa structured logging con campos contextuales
+- Implementa logging UI panel para debugging en desarrollo
+- Loggea timing de operaciones largas
+- Incluye información de sistema relevante (espacio en disco, permisos)
+- Implementa crash reporting y auto-recovery
+- Permite al usuario exportar logs para soporte técnico
+
+## Performance
+- Considera paralelismo solo para múltiples backups independientes
+- Optimiza robocopy flags según el caso de uso
+- Implementa progress reporting sin impactar performance
+- Usa lazy evaluation donde sea apropiado
+
+## Manejo de Errores Específicos
+
+### Códigos de Salida Robocopy
+- 0: Sin cambios, no se copiaron archivos
+- 1: Archivos copiados exitosamente  
+- 2: Hay archivos/directorios adicionales en destino
+- 4: Archivos mismatched detectados
+- 8: Falló al copiar algunos archivos
+- 16: Error serio - robocopy no ejecutó
+
+### Recovery Strategies  
+- Retry automático para errores de red (códigos 32, 64)
+- Logging detallado de archivos que fallan
+- Opción de continuar vs abortar en errores
+
+## Code Style
+- Usa `rustfmt` con configuración estándar
+- Prefer `match` sobre múltiples `if let`
+- Documenta funciones públicas con `///`
+- Usa nombres descriptivos para variables y funciones
+- Mantén funciones pequeñas y con responsabilidad única
+
+## Testing Strategy
+- Unit tests para lógica de parsing y validación (separada de UI)
+- Integration tests para flujos completos de backup
+- Property-based tests para validación de rutas
+- Mock UI interactions para testing de state management
+- Benchmarks para operaciones críticas de performance
+
+## Deployment Considerations
+- Compila con `--release` para distribución
+- Considera code signing para Windows
+- Implementa auto-updater si es necesario
+- Incluye installer con dependencias (Visual C++ Runtime)
+- Testa en diferentes versiones de Windows
+
+Cuando generes código, asegúrate de seguir estos patrones y considera estos aspectos específicos de GUI apps y el dominio de backups en Windows.

@@ -1,0 +1,51 @@
+# 🦀 Rust / Cargo
+/target/
+**/*.rs.bk
+*.pdb
+
+# 🔧 Build artifacts
+Cargo.lock
+
+# 📝 Logs
+*.log
+logs/
+daemon_backup_ui.log
+
+# 🎯 IDE / Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 🖥️ OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# 🔒 Local configuration
+config.json
+*.local
+
+# 📦 Distribution / packaging
+*.exe
+*.msi
+*.tar.gz
+*.zip
+
+# 🧪 Test results
+/coverage/
+.nyc_output
+
+# 🔄 Backup files
+*.bak
+*.backup
+*.tmp
+
+# 📊 Profiling data
+*.prof

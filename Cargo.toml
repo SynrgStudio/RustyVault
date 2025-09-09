@@ -1,0 +1,73 @@
+[package]
+name = "rusty-vault"
+version = "2.0.0"
+edition = "2021"
+authors = ["Alexis Texas <alexis@example.com>"]
+description = "RustyVault - Modern backup automation tool with intuitive GUI for Windows"
+license = "MIT"
+
+# Windows-specific build
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"
+
+[dependencies]
+# GUI Framework - egui para interfaz minimalista
+egui = "0.29"
+eframe = { version = "0.29", features = ["default_fonts", "glow"] }
+
+# Async Runtime para daemon de backup
+tokio = { version = "1.40", features = ["full"] }
+
+# Windows System Integration
+winapi = { version = "0.3", features = [
+    "processthreadsapi", 
+    "winbase", 
+    "winuser",
+    "shellapi"
+] }
+winreg = "0.52"
+
+# System Tray Integration
+tray-icon = "0.19"
+
+# Serialización para config.json
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Logging estructurado
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+
+# File System y Utilities
+dirs = "5.0"
+anyhow = "1.0"
+thiserror = "1.0"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+image = "0.25"  # Para procesamiento de iconos .ico
+
+# Para file dialogs nativos
+rfd = "0.15"
+# Para notificaciones de Windows  
+notify-rust = "4.11"
+
+# Para Windows API (FindWindowW, ShowWindow, SetForegroundWindow)
+windows = { version = "0.61", features = [
+	"Win32_Foundation",
+	"Win32_UI_WindowsAndMessaging",
+] }
+
+[profile.release]
+opt-level = "s"          # Optimize for size
+lto = true               # Link-time optimization  
+codegen-units = 1        # Better optimization
+panic = "abort"          # Smaller binary
+strip = true             # Remove debug symbols
+
+# Windows subsystem para evitar console window
+[[bin]]
+name = "rusty-vault"
+path = "src/main.rs"
+
+[target.'cfg(windows)'.dependencies]
+# Windows-specific dependencies ya incluidas arriba 
