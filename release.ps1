@@ -1,15 +1,15 @@
 #!/usr/bin/env pwsh
 # ============================================================================
-# DAMTools - Script de Release Automatizado
+# RustyVault - Script de Release Automatizado
 # ============================================================================
-# Este script automatiza el proceso completo de release del addon:
-# 1. Construye la documentación (mkdocs build)
-# 2. Crea un ZIP limpio del addon 
-# 3. Commitea TODOS los cambios pendientes (código + docs + ZIP)
+# Este script automatiza el proceso completo de release de RustyVault:
+# 1. Compila el proyecto en modo release (optimizado)
+# 2. Crea un ZIP con el ejecutable y archivos necesarios
+# 3. Commitea TODOS los cambios pendientes
 # 4. Crea y pushea el tag de versión
 # 5. Publica el GitHub Release con el ZIP adjunto
 #
-# Uso: .\build_release.ps1 [-Tag] [-Push] [-Clean] [-AutoRelease]
+# Uso: .\release.ps1 [-Tag] [-Push] [-Clean] [-AutoRelease]
 
 param(
     [switch]$Tag,         # Crear tag git automáticamente
@@ -18,65 +18,46 @@ param(
     [switch]$AutoRelease  # Crear release automático en GitHub
 )
 
-# Configuración del addon
-$ADDON_NAME = "damtools"
-$ADDON_FOLDER = "DAMTools"  # Nombre de la carpeta en el zip
+# Configuración del proyecto
+$PROJECT_NAME = "rusty-vault"
+$RELEASE_NAME = "RustyVault"
 
 # Archivos y carpetas a incluir en el release
 $INCLUDE_PATHS = @(
-    "__init__.py",
-    "LICENSE.txt",
-    "menu.py", 
-    "properties.py",
-    "keymap.py",
-    "utils.py",
-    "dam_theme.py",
-    "operators/",
-    "ui/",
-    "assets/",
-    "site/.well-known/damTools-Documentation.pdf"
+    "target/release/rusty-vault.exe",
+    "README.md",
+    "LICENSE",
+    "ico.ico"
 )
 
-# Archivos y carpetas a excluir explícitamente
-$EXCLUDE_PATTERNS = @(
-    "__pycache__",
-    "*.pyc",
-    "*.pyo", 
-    ".git*",
-    "docs/",
-    "site/",
-    "*.md",
-    "*.yml",
-    "*.yaml",
-    "requirements.txt",
-    "build_release.ps1",
-    ".cursor/",
-    "partnership.mdc",
-    "dam_fdm_orientation.py"
+# Archivos y carpetas a excluir del repositorio
+$EXCLUDE_FROM_REPO = @(
+    "target/",
+    "*.pdb",
+    "*.log",
+    "test_*",
+    "build_release.ps1"  # El archivo viejo que queremos eliminar
 )
 
-Write-Host ">> DAMTools Release Builder" -ForegroundColor Cyan
+Write-Host ">> RustyVault Release Builder" -ForegroundColor Cyan
 Write-Host "=================================" -ForegroundColor Cyan
 
-# Función para extraer versión del __init__.py
-function Get-AddonVersion {
+# Función para extraer versión del Cargo.toml
+function Get-ProjectVersion {
     try {
-        $initContent = Get-Content "__init__.py" -Raw
-        if ($initContent -match '"version":\s*\((\d+),\s*(\d+),\s*(\d+)\)') {
-            $major = $matches[1]
-            $minor = $matches[2] 
-            $patch = $matches[3]
-            return "$major.$minor.$patch"
+        $cargoContent = Get-Content "Cargo.toml" -Raw
+        if ($cargoContent -match 'version\s*=\s*"([^"]+)"') {
+            return $matches[1]
         }
         throw "No se pudo extraer la versión"
     }
     catch {
-        Write-Error "ERROR: Error al leer version del __init__.py: $_"
+        Write-Error "ERROR: Error al leer version del Cargo.toml: $_"
         exit 1
     }
 }
 
-# Función para verificar que estamos en un repositorio git limpio
+# Función para verificar que estamos en un repositorio git
 function Test-GitStatus {
     try {
         $status = git status --porcelain 2>$null
@@ -99,29 +80,46 @@ function Test-GitStatus {
     }
 }
 
-# Función para validar que los archivos críticos existen
-function Test-CriticalFiles {
-    $missing = @()
-    foreach ($path in $INCLUDE_PATHS) {
-        if (-not (Test-Path $path)) {
-            $missing += $path
+# Función para compilar el proyecto
+function Invoke-CargoBuild {
+    try {
+        Write-Host "  -> Compilando RustyVault en modo release..." -ForegroundColor Green
+        
+        # Limpiar build anterior
+        cargo clean
+        
+        # Compilar en modo release
+        cargo build --release
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "  -> Compilación exitosa!" -ForegroundColor Green
+            
+            # Verificar que el ejecutable existe
+            if (Test-Path "target/release/rusty-vault.exe") {
+                $exeSize = (Get-Item "target/release/rusty-vault.exe").Length / 1MB
+                Write-Host "  -> Ejecutable creado: rusty-vault.exe ($([math]::Round($exeSize, 2)) MB)" -ForegroundColor Green
+                return $true
+            } else {
+                Write-Error "ERROR: No se encontró el ejecutable compilado"
+                return $false
+            }
+        } else {
+            Write-Error "ERROR: Fallo en la compilación"
+            return $false
         }
     }
-    
-    if ($missing.Count -gt 0) {
-        Write-Error "ERROR: Archivos criticos faltantes: $($missing -join ', ')"
+    catch {
+        Write-Error "ERROR: Error durante la compilación: $_"
         return $false
     }
-    return $true
 }
 
 # Función para crear el release zip
 function New-ReleaseZip {
     param([string]$Version)
     
-    $releaseZip = "$ADDON_NAME-v$Version.zip"
+    $releaseZip = "$PROJECT_NAME-v$Version-windows.zip"
     $tempDir = "temp_release"
-    $addonDir = Join-Path $tempDir $ADDON_FOLDER
+    $releaseDir = Join-Path $tempDir $RELEASE_NAME
     
     Write-Host ">> Creando release v$Version..." -ForegroundColor Green
     
@@ -130,59 +128,41 @@ function New-ReleaseZip {
         if (Test-Path $tempDir) {
             Remove-Item $tempDir -Recurse -Force
         }
-        New-Item -ItemType Directory -Path $addonDir -Force | Out-Null
+        New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
         
         # Copiar archivos incluidos
         foreach ($path in $INCLUDE_PATHS) {
             if (Test-Path $path) {
-                if (Test-Path $path -PathType Container) {
-                    # Es un directorio
-                    $dest = Join-Path $addonDir (Split-Path $path -Leaf)
-                    Write-Host "  -> Copiando $path/" -ForegroundColor Yellow
-                    Copy-Item $path $dest -Recurse -Force
-                } else {
-                    # Es un archivo
-                    if ($path -eq "site/.well-known/damTools-Documentation.pdf") {
-                        # Caso especial: copiar PDF de documentación a la raíz del addon
-                        $dest = Join-Path $addonDir "damTools-Documentation.pdf"
-                        Write-Host "  -> Copiando $path (documentación)" -ForegroundColor Yellow
-                        Copy-Item $path $dest -Force
-                    } else {
-                        # Archivo normal
-                        $dest = Join-Path $addonDir (Split-Path $path -Leaf)
-                        Write-Host "  -> Copiando $path" -ForegroundColor Yellow  
-                        Copy-Item $path $dest -Force
-                    }
-                }
+                $fileName = Split-Path $path -Leaf
+                $dest = Join-Path $releaseDir $fileName
+                Write-Host "  -> Copiando $path" -ForegroundColor Yellow
+                Copy-Item $path $dest -Force
+            } else {
+                Write-Warning "  -> Archivo no encontrado: $path"
             }
         }
         
-                 # Limpiar archivos excluidos del directorio temporal
-         Write-Host "  -> Limpiando archivos de cache y desarrollo..." -ForegroundColor Yellow
-         
-         # Eliminar carpetas __pycache__ de una vez (más eficiente)
-         Get-ChildItem $addonDir -Name "__pycache__" -Recurse -Directory -Force | ForEach-Object {
-             $fullPath = Join-Path $addonDir $_
-             if (Test-Path $fullPath) {
-                 Remove-Item $fullPath -Recurse -Force -ErrorAction SilentlyContinue
-                 Write-Host "    -> Eliminada carpeta cache: $_" -ForegroundColor Gray
-             }
-         }
-         
-         # Eliminar archivos individuales por patrón
-         foreach ($pattern in $EXCLUDE_PATTERNS) {
-             if ($pattern -ne "__pycache__" -and $pattern -ne "*.pyc" -and $pattern -ne "*.pyo") {
-                 $items = Get-ChildItem $addonDir -Recurse -Force | Where-Object { 
-                     $_.Name -like $pattern -or $_.FullName -like "*$pattern*" 
-                 }
-                 foreach ($item in $items) {
-                     if (Test-Path $item.FullName) {
-                         Write-Host "    -> Eliminando: $($item.Name)" -ForegroundColor Gray
-                         Remove-Item $item.FullName -Recurse -Force -ErrorAction SilentlyContinue
-                     }
-                 }
-             }
-         }
+        # Crear archivo de información de versión
+        $versionInfo = @"
+RustyVault v$Version
+====================
+
+Release Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+Platform: Windows x64
+Build: Release (Optimized)
+
+Installation:
+1. Extract all files to a folder
+2. Run rusty-vault.exe
+3. Configure your backup settings
+
+For more information, visit:
+https://github.com/SynrgStudio/RustyVault
+"@
+        
+        $versionFile = Join-Path $releaseDir "VERSION.txt"
+        $versionInfo | Out-File -FilePath $versionFile -Encoding UTF8
+        Write-Host "  -> Creado VERSION.txt" -ForegroundColor Yellow
         
         # Crear el zip
         Write-Host "  -> Creando $releaseZip..." -ForegroundColor Green
@@ -193,8 +173,8 @@ function New-ReleaseZip {
         Compress-Archive -Path (Join-Path $tempDir "*") -DestinationPath $releaseZip -Force
         
         # Mostrar información del zip creado
-        $zipSize = (Get-Item $releaseZip).Length / 1KB
-        Write-Host "  -> Release creado: $releaseZip ($([math]::Round($zipSize, 2)) KB)" -ForegroundColor Green
+        $zipSize = (Get-Item $releaseZip).Length / 1MB
+        Write-Host "  -> Release creado: $releaseZip ($([math]::Round($zipSize, 2)) MB)" -ForegroundColor Green
         
         # Listar contenido para verificación
         Write-Host "  -> Contenido del release:" -ForegroundColor Cyan
@@ -220,24 +200,39 @@ function New-ReleaseZip {
     }
 }
 
-# Función para construir documentación
-function Invoke-MkDocsBuild {
-    try {
-        Write-Host "  -> Construyendo documentación con mkdocs..." -ForegroundColor Green
-        
-        # Usar configuración con exporter para builds locales
-        mkdocs build --quiet --config-file mkdocs.yml
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "  -> Documentación construida exitosamente (con PDF)" -ForegroundColor Green
-            return $true
-        } else {
-            Write-Warning "  -> Error al construir documentación con mkdocs"
-            return $false
+# Función para limpiar archivos del repositorio
+function Remove-ExcludedFiles {
+    Write-Host "  -> Limpiando archivos excluidos del repositorio..." -ForegroundColor Green
+    
+    foreach ($pattern in $EXCLUDE_FROM_REPO) {
+        try {
+            if ($pattern -eq "target/") {
+                # Caso especial para target/ - usar git rm si existe en el índice
+                $targetFiles = git ls-files target/ 2>$null
+                if ($targetFiles) {
+                    Write-Host "    -> Removiendo target/ del repositorio..." -ForegroundColor Yellow
+                    git rm -r --cached target/ 2>$null
+                }
+            }
+            elseif ($pattern -eq "build_release.ps1") {
+                # Remover el archivo viejo específicamente
+                if (git ls-files $pattern 2>$null) {
+                    Write-Host "    -> Removiendo $pattern del repositorio..." -ForegroundColor Yellow
+                    git rm --cached $pattern 2>$null
+                }
+            }
+            else {
+                # Para otros patrones, usar git rm con wildcards
+                $files = git ls-files $pattern 2>$null
+                if ($files) {
+                    Write-Host "    -> Removiendo archivos que coinciden con $pattern..." -ForegroundColor Yellow
+                    git rm --cached $pattern 2>$null
+                }
+            }
         }
-    }
-    catch {
-        Write-Warning "  -> Error con mkdocs build: $_"
-        return $false
+        catch {
+            Write-Host "    -> No se pudo remover $pattern (puede que no exista)" -ForegroundColor Gray
+        }
     }
 }
 
@@ -283,7 +278,10 @@ function Invoke-GitCommitAndPush {
     try {
         Write-Host "  -> Agregando cambios al repositorio..." -ForegroundColor Green
         
-        # Agregar todos los cambios (incluyendo el ZIP)
+        # Primero limpiar archivos excluidos
+        Remove-ExcludedFiles
+        
+        # Agregar todos los cambios (excluyendo lo que está en .gitignore)
         git add .
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "  -> Error al agregar archivos a git"
@@ -291,7 +289,7 @@ function Invoke-GitCommitAndPush {
         }
         
         # Commit con mensaje descriptivo
-        $commitMessage = "Release v$Version"
+        $commitMessage = "Release v$Version - RustyVault Windows build"
         git commit -m $commitMessage
         if ($LASTEXITCODE -eq 0) {
             Write-Host "  -> Commit creado: $commitMessage" -ForegroundColor Green
@@ -309,7 +307,7 @@ function Invoke-GitCommitAndPush {
             }
             return $true
         } else {
-            Write-Host "  -> Sin cambios para commitear (ZIP ya existe en repo)" -ForegroundColor Yellow
+            Write-Host "  -> Sin cambios para commitear" -ForegroundColor Yellow
             return $true
         }
     }
@@ -331,38 +329,50 @@ function New-GitHubRelease {
         $ghVersion = gh --version 2>$null
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "  -> GitHub CLI no está instalado o configurado"
+            Write-Host "  -> Instala GitHub CLI desde: https://cli.github.com/" -ForegroundColor Yellow
             return $false
         }
         
         # Crear el release con el ZIP adjunto
-        $releaseTitle = "DAMTools v$Version"
+        $releaseTitle = "RustyVault v$Version"
         $releaseNotes = @"
-## DAMTools v$Version
+## RustyVault v$Version
 
-### Release Notes
-- Professional Blender addon with 40+ specialized tools
-- Interactive modeling and automation features
-- Complete documentation in English and Spanish
+### 🚀 Release Notes
+- Modern backup automation tool built with Rust
+- Intuitive GUI with system tray integration
+- High-performance file operations
+- Windows-optimized build
 
-### Installation
+### 📦 Installation
 1. Download the \`$ReleaseZip\` file below
-2. In Blender: Edit > Preferences > Add-ons > Install
-3. Select the downloaded ZIP file
-4. Enable DAMTools addon
+2. Extract all files to a folder of your choice
+3. Run \`rusty-vault.exe\`
+4. Configure your backup settings through the GUI
 
-### What's Included
-- All operators and UI components
-- Icon assets and themes
-- Complete documentation
-- Professional release packaging
+### ✨ What's Included
+- Optimized Windows executable (Release build)
+- Application icon and resources
+- Documentation and license
+- Ready-to-run package
 
-For detailed documentation, visit our [documentation site](https://synrgstudio.github.io/damtools/).
+### 🔧 System Requirements
+- Windows 10/11 (x64)
+- No additional dependencies required
+
+For detailed documentation and source code, visit our [GitHub repository](https://github.com/SynrgStudio/RustyVault).
 "@
         
         gh release create $tagName $ReleaseZip --title $releaseTitle --notes $releaseNotes
         if ($LASTEXITCODE -eq 0) {
             Write-Host "  -> GitHub Release creado exitosamente!" -ForegroundColor Green
-            Write-Host "  -> URL: https://github.com/$(git config --get remote.origin.url | ForEach-Object { $_ -replace '.*github\.com[:/]', '' } | ForEach-Object { $_ -replace '\.git$', '' })/releases/tag/$tagName" -ForegroundColor Cyan
+            
+            # Obtener URL del repositorio
+            $repoUrl = git config --get remote.origin.url 2>$null
+            if ($repoUrl) {
+                $repoUrl = $repoUrl -replace '\.git$', '' -replace 'git@github\.com:', 'https://github.com/'
+                Write-Host "  -> URL: $repoUrl/releases/tag/$tagName" -ForegroundColor Cyan
+            }
             return $true
         } else {
             Write-Warning "  -> Error al crear GitHub Release"
@@ -380,18 +390,27 @@ For detailed documentation, visit our [documentation site](https://synrgstudio.g
 # ============================================================================
 
 # Verificar que estamos en el directorio correcto
-if (-not (Test-Path "__init__.py")) {
-    Write-Error "ERROR: No se encontró __init__.py. Ejecuta este script desde la raíz del proyecto."
+if (-not (Test-Path "Cargo.toml")) {
+    Write-Error "ERROR: No se encontró Cargo.toml. Ejecuta este script desde la raíz del proyecto Rust."
     exit 1
 }
 
-# Verificar archivos críticos
-if (-not (Test-CriticalFiles)) {
+# Verificar que Rust está instalado
+try {
+    $rustVersion = cargo --version 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "ERROR: Rust/Cargo no está instalado. Instala desde https://rustup.rs/"
+        exit 1
+    }
+    Write-Host "  -> Rust detectado: $rustVersion" -ForegroundColor Gray
+}
+catch {
+    Write-Error "ERROR: No se pudo verificar instalación de Rust"
     exit 1
 }
 
 # Obtener versión
-$version = Get-AddonVersion
+$version = Get-ProjectVersion
 Write-Host "  -> Versión detectada: v$version" -ForegroundColor Cyan
 
 # AutoRelease activa automáticamente Tag y Push
@@ -411,10 +430,11 @@ if ($Tag -and -not $AutoRelease -and -not (Test-GitStatus)) {
 if ($AutoRelease) {
     Write-Host "`n>> Iniciando AutoRelease completo..." -ForegroundColor Cyan
     
-    # 1. Construir documentación
-    $docsSuccess = Invoke-MkDocsBuild
-    if (-not $docsSuccess) {
-        Write-Warning "Fallo en mkdocs build, continuando..."
+    # 1. Compilar proyecto
+    $buildSuccess = Invoke-CargoBuild
+    if (-not $buildSuccess) {
+        Write-Error "ERROR: Fallo en la compilación. Abortando AutoRelease."
+        exit 1
     }
     
     # 2. Crear release ZIP
@@ -424,7 +444,7 @@ if ($AutoRelease) {
         exit 1
     }
     
-    # 3. Commit y push de todos los cambios (incluyendo ZIP)
+    # 3. Commit y push de todos los cambios
     $commitSuccess = Invoke-GitCommitAndPush -ReleaseZip $releaseZip -Version $version
     if (-not $commitSuccess) {
         Write-Warning "Fallo en commit/push, continuando con tag..."
@@ -445,7 +465,12 @@ if ($AutoRelease) {
     }
 }
 else {
-    # Crear release ZIP para otros modos
+    # Compilar y crear release ZIP para otros modos
+    $buildSuccess = Invoke-CargoBuild
+    if (-not $buildSuccess) {
+        exit 1
+    }
+    
     $releaseZip = New-ReleaseZip -Version $version
     if (-not $releaseZip) {
         exit 1
@@ -463,26 +488,26 @@ Write-Host "   Versión: v$version" -ForegroundColor White
 
 if ($AutoRelease) {
     Write-Host "   Tag: v$version (creado y pusheado)" -ForegroundColor Green
-    Write-Host "   GitHub Release: Creado automaticamente" -ForegroundColor Green
-    Write-Host "   Estado: LISTO PARA DISTRIBUCION" -ForegroundColor Green
+    Write-Host "   GitHub Release: Creado automáticamente" -ForegroundColor Green
+    Write-Host "   Estado: LISTO PARA DISTRIBUCIÓN" -ForegroundColor Green
     
     Write-Host "`n  -> AutoRelease completado!" -ForegroundColor Cyan
-    Write-Host "   1. Documentación construida (mkdocs)" -ForegroundColor Gray
-    Write-Host "   2. Todos los cambios commiteados al repositorio (codigo + docs + ZIP)" -ForegroundColor Gray
+    Write-Host "   1. Proyecto compilado en modo release" -ForegroundColor Gray
+    Write-Host "   2. Todos los cambios commiteados al repositorio" -ForegroundColor Gray
     Write-Host "   3. Tag v$version creado y pusheado" -ForegroundColor Gray  
     Write-Host "   4. GitHub Release publicado con ZIP adjunto" -ForegroundColor Gray
-    Write-Host "   5. Addon listo para descarga publica" -ForegroundColor Gray
+    Write-Host "   5. RustyVault listo para descarga pública" -ForegroundColor Gray
 }
 elseif ($Tag) {
     Write-Host "   Tag: v$version" -ForegroundColor White
     
-    Write-Host "`n  -> Proximos pasos:" -ForegroundColor Yellow
-    Write-Host "   1. Probar el addon instalando $releaseZip en Blender" -ForegroundColor Gray
+    Write-Host "`n  -> Próximos pasos:" -ForegroundColor Yellow
+    Write-Host "   1. Probar el ejecutable desde $releaseZip" -ForegroundColor Gray
     Write-Host "   2. Subir a GitHub Releases manualmente" -ForegroundColor Gray
 }
 else {
-    Write-Host "`n  -> Proximos pasos:" -ForegroundColor Yellow
-    Write-Host "   1. Probar el addon instalando $releaseZip en Blender" -ForegroundColor Gray
-    Write-Host "   2. Crear release completo con: .\build_release.ps1 -AutoRelease" -ForegroundColor Gray
-    Write-Host "   3. O solo tag con: .\build_release.ps1 -Tag" -ForegroundColor Gray
-} 
+    Write-Host "`n  -> Próximos pasos:" -ForegroundColor Yellow
+    Write-Host "   1. Probar el ejecutable desde $releaseZip" -ForegroundColor Gray
+    Write-Host "   2. Crear release completo con: .\release.ps1 -AutoRelease" -ForegroundColor Gray
+    Write-Host "   3. O solo tag con: .\release.ps1 -Tag" -ForegroundColor Gray
+}

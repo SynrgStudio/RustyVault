@@ -38,6 +38,11 @@ config.json
 *.tar.gz
 *.zip
 
+# 🚀 Release artifacts
+rusty-vault-v*.zip
+temp_release/
+build_release.ps1
+
 # 🧪 Test results
 /coverage/
 .nyc_output
@@ -59,6 +64,8 @@ config.json
 /out2/
 test_parser.*
 test_output.*
+build_release.ps1
+
 
 # 🎯 IDE specific
 /.cursor/

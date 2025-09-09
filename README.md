@@ -9,7 +9,7 @@
 
 > Una aplicación **moderna de backup automático** que combina la **robustez de robocopy** con una **interfaz gráfica intuitiva** desarrollada en Rust.
 
-![RustyVault Screenshot](screenshot.png)
+![RustyVault Screenshot](rustyvault.png)
 
 ## 🌟 Features
 
@@ -62,7 +62,7 @@
 - **Robocopy** (included with Windows)
 
 ### Download & Install
-1. Download the latest release from [Releases](https://github.com/yourusername/rusty-vault/releases)
+1. Download the latest release from [Releases](https://github.com/SynrgStudio/rusty-vault/releases)
 2. Extract `rusty-vault.exe` to your preferred location
 3. Place `ico.ico` in the same directory (optional, for window icon)
 4. Run `rusty-vault.exe`
@@ -154,7 +154,7 @@ Edit `config.json` for advanced settings:
 ### Build from Source
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/rusty-vault.git
+git clone https://github.com/SynrgStudio/RustyVault.git
 cd rusty-vault
 
 # Build release
@@ -248,9 +248,9 @@ src/
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/rusty-vault/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/rusty-vault/discussions)
-- **Documentation**: [Wiki](https://github.com/yourusername/rusty-vault/wiki)
+- **Issues**: [GitHub Issues](https://github.comSynrgStudio/rusty-vault/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/SynrgStudio/rusty-vault/discussions)
+- **Documentation**: [Wiki](https://github.com/SynrgStudio/rusty-vault/wiki)
 
 ## 📄 License
 
