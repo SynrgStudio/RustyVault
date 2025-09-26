@@ -4,6 +4,7 @@
 use eframe::egui;
 
 /// Status indicator component - muestra estado con color y emoji
+#[allow(dead_code)]
 pub fn status_indicator(ui: &mut egui::Ui, is_active: bool, active_text: &str, inactive_text: &str) {
     if is_active {
         ui.colored_label(egui::Color32::GREEN, format!("✅ {}", active_text));

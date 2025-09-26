@@ -31,6 +31,7 @@ pub struct BackupMetrics {
 }
 
 /// Estado y metadata de un backup pair
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct BackupPairStatus {
     pub backup_pair_id: String,
@@ -359,7 +360,14 @@ impl BackgroundManager {
         };
         
         // Clonar sender para usar en el thread de backup
-        let sender = unsafe { BACKGROUND_SENDER.as_ref() }.cloned();
+        let sender = unsafe {
+            let ptr: *const Option<Sender<BackgroundCommand>> = &raw const BACKGROUND_SENDER;
+            if let Some(opt_ref) = ptr.as_ref() {
+                opt_ref.clone()
+            } else {
+                None
+            }
+        };
         
         // Ejecutar backup en thread separado para no bloquear background manager
         std::thread::spawn(move || {
@@ -745,13 +753,19 @@ static mut BACKGROUND_SENDER: Option<Sender<BackgroundCommand>> = None;
 /// Enviar comando al hilo de fondo
 pub fn send_background_command(command: BackgroundCommand) {
     unsafe {
-        if let Some(sender) = &BACKGROUND_SENDER {
-            if let Err(e) = sender.send(command.clone()) {
-                if !matches!(command, BackgroundCommand::Exit) {
-                    error!("❌ Error sending background command {:?}: {}", command, e);
+        let ptr: *const Option<Sender<BackgroundCommand>> = &raw const BACKGROUND_SENDER;
+        if let Some(opt_ref) = ptr.as_ref() {
+            if let Some(sender) = opt_ref.as_ref() {
+                if let Err(e) = sender.send(command.clone()) {
+                    if !matches!(command, BackgroundCommand::Exit) {
+                        error!("❌ Error sending background command {:?}: {}", command, e);
+                    }
                 }
+                return;
             }
-        } else if !matches!(command, BackgroundCommand::Exit) {
+        }
+
+        if !matches!(command, BackgroundCommand::Exit) {
             error!("❌ Background sender not available");
         }
     }
@@ -887,7 +901,29 @@ impl BackupApp {
             }
             SettingsAction::UpdateAutoStart(enabled) => {
                 info!("🚀 Auto-start setting: {}", enabled);
-                // TODO: Implement Windows startup registry modification
+                // Persist in config
+                if let Ok(mut config) = self.config.lock() {
+                    config.start_with_windows = enabled;
+                    if let Err(e) = config.save() {
+                        error!("❌ Error saving config: {}", e);
+                    }
+                } else {
+                    error!("❌ Could not acquire config lock to update start_with_windows");
+                }
+
+                // Try to update Windows startup using a Startup-folder shortcut (noop on non-windows builds)
+                match crate::system::registry::get_current_exe_path() {
+                    Ok(exe_path) => {
+                        if let Err(e) = crate::system::startup::set_startup_shortcut(enabled, &exe_path) {
+                            error!("❌ Error configuring Startup shortcut: {}", e);
+                        } else {
+                            info!("✅ Startup shortcut updated: {}", enabled);
+                        }
+                    }
+                    Err(e) => {
+                        error!("❌ Could not determine current exe path for startup registration: {}", e);
+                    }
+                }
             }
             SettingsAction::UpdateNotificationEnabled(enabled) => {
                 info!("🔔 Notifications enabled: {}", enabled);
@@ -946,6 +982,35 @@ impl BackupApp {
                     self.settings_window = Some(settings_window);
                     info!("⚙️ Settings window opened");
                 }
+            }
+            UIAction::UpdateAutoStart(enabled) => {
+                // Guardar inmediatamente en config
+                if let Ok(mut config) = self.config.lock() {
+                    config.start_with_windows = enabled;
+                    if let Err(e) = config.save() {
+                        error!("❌ Error saving config: {}", e);
+                    }
+                }
+                // Actualizar shortcut
+                match crate::system::registry::get_current_exe_path() {
+                    Ok(exe_path) => {
+                        if let Err(e) = crate::system::startup::set_startup_shortcut(enabled, &exe_path) {
+                            error!("❌ Error configuring Startup shortcut: {}", e);
+                        } else {
+                            info!("✅ Startup shortcut updated: {}", enabled);
+                        }
+                    }
+                    Err(e) => {
+                        error!("❌ Could not determine current exe path for startup registration: {}", e);
+                    }
+                }
+                // Mantener la ventana enfocada después de procesar
+                let ctx_clone = _ctx.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    ctx_clone.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+                    ctx_clone.send_viewport_cmd(egui::ViewportCommand::Focus);
+                });
             }
             UIAction::RunBackupNow => {
                 send_background_command(BackgroundCommand::RunBackupNow);

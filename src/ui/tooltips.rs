@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// Sistema de tooltips educativos para parámetros de Robocopy
 /// Cada tooltip explica MUY claramente qué hace cada opción para usuarios no técnicos
 /// 
@@ -66,6 +67,7 @@ Ejemplo: D:\Backup\Documents"#;
 
 /// Helper function para mostrar tooltips con icono de ayuda
 pub fn show_tooltip_with_icon(ui: &mut egui::Ui, text: &str, tooltip: &str) -> egui::Response {
+    #![allow(dead_code)]
     ui.horizontal(|ui| {
         ui.label(text);
         ui.label("❔")

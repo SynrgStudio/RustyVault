@@ -113,7 +113,23 @@ impl SystemTray {
             Icon::from_path(&icon_path, None)
                 .map_err(|e| anyhow::anyhow!("Error cargando icono: {}", e))
         } else {
-            warn!("⚠️ Usando icono por defecto");
+            warn!("⚠️ ico.ico no encontrado en disco, usando ico.ico embebido como fallback");
+
+            // Escribimos el ico embebido a un temporal y lo usamos
+            if let Ok(tmp_dir) = std::env::temp_dir().canonicalize() {
+                let tmp_path = tmp_dir.join("rustyvault_embedded_icon.ico");
+                let _ = std::fs::write(&tmp_path, include_bytes!("../../ico.ico"));
+                if tmp_path.exists() {
+                    if let Ok(img) = image::open(&tmp_path) {
+                        let rgba = img.to_rgba8();
+                        let (w, h) = rgba.dimensions();
+                        return Icon::from_rgba(rgba.into_raw(), w as u32, h as u32)
+                            .map_err(|e| anyhow::anyhow!("Error creando icono embebido: {}", e));
+                    }
+                }
+            }
+
+            // Último recurso: color block simple
             let mut icon_rgba = Vec::new();
             for _ in 0..(16 * 16) {
                 icon_rgba.extend_from_slice(&[0, 100, 200, 255]);

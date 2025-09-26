@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// Iconos seguros que funcionan correctamente en egui
 /// Estos iconos han sido probados y se renderizan correctamente
 pub struct SafeIcons;

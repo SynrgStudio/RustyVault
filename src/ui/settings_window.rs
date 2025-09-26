@@ -1,7 +1,8 @@
+#![allow(dead_code)]
 use eframe::egui;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tracing::{info, debug};
+use tracing::info;
 use crate::core::{AppConfig, RobocopyConfig};
 
 /// Actions that the settings window can trigger

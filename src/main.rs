@@ -1,3 +1,5 @@
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
+
 use anyhow::Result;
 use std::env;
 use tracing::{info, error, warn};
@@ -99,11 +101,10 @@ fn load_icon() -> egui::IconData {
         // Leer archivo ico
         if let Ok(icon_bytes) = std::fs::read(&icon_path) {
             // Para egui necesitamos convertir .ico a RGBA
-            // Por simplicidad, usamos el icono por defecto si hay problemas
             if let Ok(icon_image) = image::load_from_memory(&icon_bytes) {
                 let rgba_image = icon_image.to_rgba8();
                 let (width, height) = rgba_image.dimensions();
-                
+
                 return egui::IconData {
                     rgba: rgba_image.into_raw(),
                     width: width as u32,
@@ -117,7 +118,27 @@ fn load_icon() -> egui::IconData {
         warn!("⚠️ ico.ico no encontrado en: {}", icon_path.display());
     }
     
-    // Fallback: icono por defecto
+    // Fallback: usar el .ico embebido en el binario (incluido en el repo)
+    // Escribimos el bytes incrustados a un archivo temporal y lo leemos con image
+    if let Ok(temp_dir) = std::env::temp_dir().canonicalize() {
+        let tmp_path = temp_dir.join("rustyvault_embedded_icon.ico");
+        // Ignorar errores al escribir; si falla, seguimos al default
+        let _ = std::fs::write(&tmp_path, include_bytes!("../ico.ico"));
+        if tmp_path.exists() {
+            if let Ok(icon_image) = image::open(&tmp_path) {
+                let rgba_image = icon_image.to_rgba8();
+                let (width, height) = rgba_image.dimensions();
+
+                return egui::IconData {
+                    rgba: rgba_image.into_raw(),
+                    width: width as u32,
+                    height: height as u32,
+                };
+            }
+        }
+    }
+
+    // Último recurso: icono por defecto
     egui::IconData::default()
 }
 

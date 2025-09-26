@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use eframe::egui;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -14,6 +15,7 @@ pub enum UIAction {
     Exit,
     ConfigChanged,
     OpenSettings,
+    UpdateAutoStart(bool),
     
     // === NEW CARDS ACTIONS ===
     AddBackupPair { source: String, destination: String },
@@ -198,8 +200,8 @@ impl MainWindow {
                     &mut self.temp_start_with_windows,
                     "Start with Windows",
                     START_WITH_WINDOWS_TOOLTIP,
-                ).clicked() {
-                    action_callback(UIAction::ConfigChanged);
+                ).changed() {
+                    action_callback(UIAction::UpdateAutoStart(self.temp_start_with_windows));
                 }
                 
                 ui.separator();
@@ -1056,7 +1058,7 @@ impl MainWindow {
         pair: &crate::core::config::BackupPair,
         active_index: usize,
         total_active_pairs: usize,
-        existing_pairs: &[crate::core::config::BackupPair],
+    _existing_pairs: &[crate::core::config::BackupPair],
         background_state: &Arc<Mutex<crate::app::AppState>>,
         action_callback: &mut dyn FnMut(UIAction)
     ) {
@@ -1064,7 +1066,7 @@ impl MainWindow {
         let validation = crate::core::PathValidator::validate_backup_pair(
             &pair.source.display().to_string(),
             &pair.destination.display().to_string(),
-            existing_pairs,
+            _existing_pairs,
             Some(original_index)
         );
 
@@ -1187,7 +1189,7 @@ impl MainWindow {
         ui: &mut egui::Ui,
         original_index: usize,
         pair: &crate::core::config::BackupPair,
-        existing_pairs: &[crate::core::config::BackupPair],
+    _existing_pairs: &[crate::core::config::BackupPair],
         action_callback: &mut dyn FnMut(UIAction)
     ) {
         ui.group(|ui| {
@@ -1509,9 +1511,9 @@ impl MainWindow {
     }
 
     /// Obtener prioridad de un backup pair activo
-    fn get_active_priority(&self, index: usize, existing_pairs: &[crate::core::config::BackupPair]) -> usize {
+    fn get_active_priority(&self, index: usize, _existing_pairs: &[crate::core::config::BackupPair]) -> usize {
         let mut active_count = 0;
-        for (i, pair) in existing_pairs.iter().enumerate() {
+        for (i, pair) in _existing_pairs.iter().enumerate() {
             if pair.enabled {
                 active_count += 1;
                 if i == index {
@@ -1523,14 +1525,14 @@ impl MainWindow {
     }
 
     /// Contar backup pairs activos
-    fn count_active_pairs(&self, existing_pairs: &[crate::core::config::BackupPair]) -> usize {
-        existing_pairs.iter().filter(|pair| pair.enabled).count()
+    fn count_active_pairs(&self, _existing_pairs: &[crate::core::config::BackupPair]) -> usize {
+        _existing_pairs.iter().filter(|pair| pair.enabled).count()
     }
 
     /// Obtener índice dentro de los backup pairs activos
-    fn get_active_index(&self, index: usize, existing_pairs: &[crate::core::config::BackupPair]) -> usize {
+    fn get_active_index(&self, index: usize, _existing_pairs: &[crate::core::config::BackupPair]) -> usize {
         let mut active_index = 0;
-        for (i, pair) in existing_pairs.iter().enumerate() {
+        for (i, pair) in _existing_pairs.iter().enumerate() {
             if i == index {
                 return active_index;
             }
